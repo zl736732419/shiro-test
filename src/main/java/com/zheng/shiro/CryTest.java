@@ -1,5 +1,8 @@
 package com.zheng.shiro;
 
+import org.apache.commons.beanutils.BeanUtilsBean;
+import org.apache.commons.beanutils.converters.AbstractConverter;
+import org.apache.shiro.authc.ExcessiveAttemptsException;
 import org.apache.shiro.codec.Base64;
 import org.apache.shiro.codec.Hex;
 import org.apache.shiro.crypto.SecureRandomNumberGenerator;
@@ -8,8 +11,9 @@ import org.apache.shiro.crypto.hash.HashRequest;
 import org.apache.shiro.crypto.hash.Md5Hash;
 import org.apache.shiro.crypto.hash.Sha1Hash;
 import org.apache.shiro.crypto.hash.SimpleHash;
+import org.apache.shiro.realm.jdbc.JdbcRealm;
 import org.apache.shiro.util.ByteSource;
-import org.apache.shiro.util.SimpleByteSource;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -23,7 +27,7 @@ import org.junit.Test;
  * @author Administrator
  * @data 2016年5月26日 下午10:56:14
  */
-public class CryTest {
+public class CryTest extends BaseTest {
 
 	@Test
 	public void testBase64() {
@@ -74,8 +78,7 @@ public class CryTest {
 	}
 
 	/**
-	 * 通用的hash加密支持SimpleHash
-	 * 在该类下还实现了许多算法，其中SHA1Hash和Md5Hash等都是它的子类
+	 * 通用的hash加密支持SimpleHash 在该类下还实现了许多算法，其中SHA1Hash和Md5Hash等都是它的子类
 	 *
 	 * @author Administrator
 	 * @data 2016年5月26日 下午11:15:47
@@ -109,7 +112,77 @@ public class CryTest {
 
 		String result = service.computeHash(request).toBase64();
 		System.out.println(result);
-		
+
 	}
 
+	@Test
+	public void testPasswordWithMyReam() {
+		login("classpath:shiro-password-service.ini", "zang", "123");
+		Assert.assertEquals(true, getSubject().isAuthenticated());
+	}
+
+	@Test
+	public void testGeneratePassword() {
+		String algorithmName = "md5";
+		String username = "liu";
+		String password = "123";
+		String salt1 = username;
+		// String salt2 = new SecureRandomNumberGenerator().nextBytes().toHex();
+		String salt2 = "0072273a5d87322163795118fdd7c45e";
+		int hashIterations = 2;
+
+		SimpleHash hash = new SimpleHash(algorithmName, password, salt1 + salt2, hashIterations);
+		String encodedPassword = hash.toHex();
+		System.out.println(salt2);
+		System.out.println(encodedPassword);
+	}
+
+	@Test
+	public void testJdbcPassword() {
+		login("classpath:shiro-jdbc-password.ini", "wu", "123");
+		Assert.assertEquals(true, getSubject().isAuthenticated());
+	}
+
+	@Test
+	public void testHashedCredentialsMatcherWithMyRealm2() {
+		// 使用testGeneratePassword生成的散列密码
+		login("classpath:shiro-hashCredentialMatcher.ini", "liu", "123");
+	}
+
+	@Test
+	public void testJdbcHashedCredentialsMatcherWithMyRealm() {
+		BeanUtilsBean.getInstance().getConvertUtils().register(new EnumConverter(), JdbcRealm.SaltStyle.class);
+		// 使用testGeneratePassword生成的散列密码
+		login("classpath:shiro-jdbc-hashCredentialMatcher.ini", "liu", "123");
+	}
+
+	@SuppressWarnings("unused")
+	private class EnumConverter extends AbstractConverter {
+		@Override
+		protected String convertToString(final Object value) throws Throwable {
+			return ((Enum) value).name();
+		}
+
+		@Override
+		protected Object convertToType(final Class type, final Object value) throws Throwable {
+			return Enum.valueOf(type, value.toString());
+		}
+
+		@Override
+		protected Class getDefaultType() {
+			return null;
+		}
+
+	}
+
+	@Test(expected = ExcessiveAttemptsException.class)
+	public void testRetryLimitHashedCredentialsMatcherWithMyRealm() {
+		for (int i = 1; i <= 5; i++) {
+			System.out.println("login ... " + i);
+			try {
+				login("classpath:shiro-retryLimitHashedCredentialMatcher.ini", "liu", "234");
+			} catch (Exception e) {}
+		}
+		login("classpath:shiro-retryLimitHashedCredentialMatcher.ini", "liu", "234");
+	}
 }

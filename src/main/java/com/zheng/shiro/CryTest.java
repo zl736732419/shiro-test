@@ -149,6 +149,14 @@ public class CryTest extends BaseTest {
 		login("classpath:shiro-hashCredentialMatcher.ini", "liu", "123");
 	}
 
+	/**
+	 * shiro默认使用了apache commons BeanUtils，没有提供Enum类型的值转化，所以需要自己实现一个Enum类型转换器
+	 * 这样在shiro.ini中配置Enum才能被识别
+	 * 
+	 *
+	 * @author Administrator
+	 * @data 2016年5月29日 上午11:08:13
+	 */
 	@Test
 	public void testJdbcHashedCredentialsMatcherWithMyRealm() {
 		BeanUtilsBean.getInstance().getConvertUtils().register(new EnumConverter(), JdbcRealm.SaltStyle.class);
@@ -156,13 +164,14 @@ public class CryTest extends BaseTest {
 		login("classpath:shiro-jdbc-hashCredentialMatcher.ini", "liu", "123");
 	}
 
-	@SuppressWarnings("unused")
+	@SuppressWarnings("rawtypes")
 	private class EnumConverter extends AbstractConverter {
 		@Override
 		protected String convertToString(final Object value) throws Throwable {
 			return ((Enum) value).name();
 		}
 
+		@SuppressWarnings("unchecked")
 		@Override
 		protected Object convertToType(final Class type, final Object value) throws Throwable {
 			return Enum.valueOf(type, value.toString());
